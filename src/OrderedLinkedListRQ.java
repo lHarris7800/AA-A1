@@ -33,10 +33,12 @@ public class OrderedLinkedListRQ implements Runqueue {
         }
 
         //Insert new node into linked list
-        ProcNode newNode = new ProcNode(head, new Proc(procLabel,vt));
+        ProcNode newNode = new ProcNode(curNode, new Proc(procLabel,vt));
 
-        if(lastNode != null) //Updating last node if new proc isn't at top of queue
+        if(lastNode != null) { //Updating last node if new proc isn't at top of queue
             lastNode.next = newNode;
+        }else
+            head = newNode; //Setting head if new node is top of queue
     } // end of enqueue()
 
 
@@ -143,12 +145,16 @@ public class OrderedLinkedListRQ implements Runqueue {
         //Iterate over all queue
         ProcNode curNode = head;
 
-        while(curNode != null ){
-            os.write(curNode.proc.procLabel() + " "); //Append proc to line
+        while(curNode != null){
+            if(curNode != head)
+                os.write(" ");
+
+            os.write(curNode.proc.procLabel()); //Append proc to line
 
             curNode = curNode.next;
         }
 
+        os.write("\n");
         os.flush();
     } // end of printAllProcess()
 
