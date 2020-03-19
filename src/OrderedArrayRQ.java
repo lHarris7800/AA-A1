@@ -147,7 +147,6 @@ public class OrderedArrayRQ implements Runqueue {
 			os.write(processes[i].procLabel());
 		}
 
-		// os.write(curNode.proc.procLabel());
 
 	} // end of printAllProcesses()
 // end of class OrderedArrayRQ	
