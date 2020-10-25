@@ -11,72 +11,89 @@ import java.lang.String;
  */
 public class OrderedArrayRQ implements Runqueue {
 	private Proc[] processes;
-	private int startArray = 0;
-	private int endArray = 0;
-	// TODO currently array set to max length of 10, need to confirm what correct
-	// length should be?
-	private int maxLength = 10;
+	private int endArray;
+	private final int startLength = 10;
+	private final float resizeFactor = 0.2f;
 
 	/**
 	 * Constructs empty queue
 	 */
-	public OrderedArrayRQ() {
-		processes = new Proc[maxLength];
+	OrderedArrayRQ() {
+		processes = new Proc[startLength];
+		endArray = -1;
 
 	} // end of OrderedArrayRQ()
 
 	@Override
-	public void enqueue(String procLabel, int vt) {
-		boolean running = true;
-		// checking array not at max length;
-		// TODO rearrange to enter them in order of priority by vt
-		if (endArray == startArray) {
-			processes[endArray] = new Proc(procLabel, vt);
-			endArray++;
-		}
-		// checking if array has elements && if array is not at max length and has an
-		// additional free spot
-		while (running) {
-			if (endArray != startArray && endArray <= maxLength - 2) {
-				for (int i = startArray; i <= endArray; i++) {
-					// if vt is less than vt of current element
-					if (vt < processes[i].vt()) {
-						// set j to end of array, and decrement until it reaches i
-						for (int j = endArray; j >= i; j--) {
-							// move the value at element j to the next element over (j+1)
-							processes[j + 1] = processes[j];
-						}
-					}
-					// set new element in to its position
-					processes[i] = new Proc(procLabel, vt);
-					// increment endArray to account for new process
-					endArray++;
-					running = false;
-				}
+	public void enqueue(String procLabel, int vt){
+		boolean enqueued = false;
+
+		if (endArray == processes.length - 1){
+			//Resize array
+			Proc[] newProcesses = new Proc[(int)(processes.length * (1+resizeFactor/2))];
+
+			for(int i = 0; i <= endArray; i++){
+				if(processes[i].vt() <= vt){
+					newProcesses[i] = new Proc(procLabel,vt);//Insert new Proc
+
+					for(int j = i; j <= endArray; j++)
+						newProcesses[j+1] = processes[j]; //Copy procs shallower then newProc
+
+					i = endArray+1;
+				}else
+					newProcesses[i] = processes[i]; //Copy procs deeper than newProc
 			}
+
+			if(processes[endArray].vt() > vt)
+				newProcesses[endArray + 1] = new Proc(procLabel, vt);
+			processes = newProcesses;
+		} else {
+
+			for (int i = endArray + 1; i >= 0 && !enqueued; i--) {
+				if (i > 0) {
+					if (processes[i - 1].vt() > vt) {
+						processes[i] = new Proc(procLabel, vt); // new proc inserted
+						enqueued = true;
+					}
+				} else {
+					processes[i] = new Proc(procLabel, vt); // new proc inserted
+					enqueued = true;
+				}
+
+				if (!enqueued)
+					processes[i] = processes[i - 1];
+			}
+
+			if (endArray == -1)
+				processes[0] = new Proc(procLabel, vt);
 		}
 
-	} // end of enqueue()
+		endArray++;
+	}
 
 	@Override
 	public String dequeue() {
-		// checking array is not empty
-		if (startArray != endArray) {
-			// removes front of the array
-			for (int i = startArray; i < endArray - 1; i++) {
-				processes[i] = processes[i + 1];
-			}
-			// decrement end array to account for lost slot
-			endArray--;
+		String returnLabel = processes[endArray].procLabel();
+		processes[endArray] = null; //dequeue lowest element from end of list
+
+		if((float)endArray/processes.length < 1-resizeFactor){
+			Proc[] newProcesses = new Proc[(int)(processes.length * (1-resizeFactor/2))];
+			//shrink array
+
+			for(int i = 0; i < endArray; i++)
+				newProcesses[i] = processes[i];
+
+			processes = newProcesses;
 		}
-		// TODO
-		return "procLabel.....";
+
+		endArray--;
+
+		return returnLabel;
 	} // end of dequeue()
 
 	@Override
 	public boolean findProcess(String procLabel) {
-		// Implement me
-		for (int i = startArray; i < endArray; i++) {
+		for (int i = 0; i <= endArray; i++) {
 			if (processes[i].procLabel().equals(procLabel)) {
 				return true;
 			}
@@ -87,15 +104,16 @@ public class OrderedArrayRQ implements Runqueue {
 
 	@Override
 	public boolean removeProcess(String procLabel) {
-		for (int i = startArray; i < endArray; i++) {
+		for (int i = 0; i <= endArray; i++) {
 			// find process
 			if (processes[i].procLabel().equals(procLabel)) {
 				// overwrite current process with next process in queue, repeat til end
-				for (int j = i; j < endArray - 1; j++) {
-					processes[i] = processes[i + 1];
+				for (int j = i; j <= endArray; j++) {
+					processes[j] = processes[j + 1];
 				}
 				// reduce endArray
 				endArray--;
+				i = endArray+1;
 				return true;
 			}
 		}
@@ -107,47 +125,49 @@ public class OrderedArrayRQ implements Runqueue {
 	public int precedingProcessTime(String procLabel) {
 		// this assumes preceding is from front of array up to given element
 		int vtpCount = 0;
-		boolean counting = true;
+		boolean found = false;
 		// start counting
-		while (counting) {
-			for (int i = startArray; i < endArray; i++) {
-				// add vt count of every element
-				vtpCount += processes[i].vt();
-				// if we find process match - stop adding, remove current process vt, and stop
-				// counting
-				if (processes[i].procLabel().equals(procLabel)) {
-					vtpCount -= processes[i].vt();
-					counting = false;
-				}
-			}
+		for (int i = endArray; i >= 0 && !found; i--) {
+			// if we find process match
+			// counting
+			if (processes[i].procLabel().equals(procLabel))
+				found = true;
+			else
+				vtpCount += processes[i].vt(); // add vt count of preceding element
 		}
-		return vtpCount;
 
+		if(found)
+			return vtpCount;
+		else
+			return -1;
 	}// end of precedingProcessTime()
 
 	@Override
 	public int succeedingProcessTime(String procLabel) {
 		// this assume from given element to end of array
 		int vtsCount = 0;
-		for (int i = startArray; i < endArray; i++) {
-			// if we find process match - add vt of all elements after it
-			if (processes[i].procLabel().equals(procLabel)) {
-				for (int j = i; j < endArray; j++) {
-					vtsCount += processes[i].vt();
-				}
-			}
+		boolean found = false;
+
+		for (int i = 0; i <= endArray && !found; i++) {
+			if (processes[i].procLabel().equals(procLabel))
+				found = true;
+			else
+				vtsCount += processes[i].vt(); //add vt count of succeeding element
 		}
 
-		return vtsCount;
+		if(found)
+			return vtsCount;
+		else
+			return -1;
 	} // end of precedingProcessTime()
 
 	@Override
 	public void printAllProcesses(PrintWriter os) {
-		for (int i = startArray; i < endArray; i++) {
-			os.write(processes[i].procLabel());
-		}
+		for (int i = endArray; i >= 0; i--)
+			os.write(processes[i].procLabel() + " ");
 
-
+		os.write("\n");
+		os.flush();
 	} // end of printAllProcesses()
 // end of class OrderedArrayRQ	
 }
